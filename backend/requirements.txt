@@ -15,3 +15,4 @@ pydantic-settings==2.0.3
 python-jose==3.3.0
 ollama==0.1.7
 httpx==0.25.2
+aiofiles==23.2.1

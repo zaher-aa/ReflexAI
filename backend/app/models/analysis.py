@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Optional
 from datetime import datetime
 
 class KeywordItem(BaseModel):
@@ -28,6 +28,7 @@ class AnalysisResult(BaseModel):
     keyness: KeynessResult
     semanticClusters: List[SemanticCluster]
     sentiment: SentimentResult
+    aiInsights: Optional[Dict] = None  # Add AI insights field
 
 class TextInput(BaseModel):
     text: str

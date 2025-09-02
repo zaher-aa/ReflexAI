@@ -14,6 +14,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Download NLTK data
 RUN python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('averaged_perceptron_tagger')"
 
+# Download spaCy model
+RUN python -m spacy download en_core_web_sm
+
 # Copy the rest of the application
 COPY . .
 

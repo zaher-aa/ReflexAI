@@ -4,6 +4,10 @@ export interface AnalysisResult {
   keyness: KeynessResult;
   semanticClusters: SemanticCluster[];
   sentiment: SentimentResult;
+  aiInsights?: {
+    ai_insights: string;
+    model: string;
+  };
 }
 
 export interface KeynessResult {
@@ -32,4 +36,5 @@ export interface FileUploadResponse {
   success: boolean;
   message: string;
   analysisId?: string;
+  progress?: number;
 }
