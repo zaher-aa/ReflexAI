@@ -49,3 +49,6 @@ make up
 
 # View logs if needed
 make logs
+
+# Run Ollama Service
+docker exec reflexai-ollama ollama pull llama3.1
