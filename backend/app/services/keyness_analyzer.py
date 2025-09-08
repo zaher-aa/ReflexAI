@@ -18,16 +18,46 @@ class KeynessAnalyzer:
             relative_freq = freq / total_words
             ref_freq = reference_freq.get(word, 0.0001)
             
-            # Log-likelihood calculation
-            score = 2 * freq * math.log(relative_freq / ref_freq) if ref_freq > 0 else 0
+            # Log-likelihood calculation (preserving sign for positive/negative keyness)
+            if ref_freq > 0:
+                score = 2 * freq * math.log(relative_freq / ref_freq)
+            else:
+                score = 0
+            
+            # Effect size calculation (standardized difference)
+            effect_size = score / math.sqrt(freq) if freq > 0 else 0
             
             keyness_scores.append({
                 'word': word,
-                'score': abs(score),
-                'frequency': freq
+                'score': abs(score),  # Keep abs for ranking
+                'raw_score': score,   # Keep raw score for effect direction
+                'effect_size': effect_size,
+                'frequency': freq,
+                'confidence': min(0.95, freq / total_words * 10)  # Simple confidence metric
             })
         
-        return sorted(keyness_scores, key=lambda x: x['score'], reverse=True)[:30]
+        # Sort by absolute score but include both positive and negative
+        sorted_scores = sorted(keyness_scores, key=lambda x: x['score'], reverse=True)[:30]
+        
+        # Add some underused words (negative keyness) if they exist in reference
+        underused_words = []
+        for word in list(reference_freq.keys())[:20]:
+            if word not in word_freq and reference_freq[word] > 0.005:  # Common words not in text
+                effect_size = -reference_freq[word] * 10  # Negative effect for missing words
+                underused_words.append({
+                    'word': word,
+                    'score': reference_freq[word] * 100,
+                    'raw_score': -reference_freq[word] * 100,
+                    'effect_size': effect_size,
+                    'frequency': 0,
+                    'confidence': 0.7
+                })
+        
+        # Add top underused words to show negative keyness
+        if underused_words:
+            sorted_scores.extend(sorted(underused_words, key=lambda x: x['score'], reverse=True)[:5])
+        
+        return sorted_scores
     
     def _get_default_frequencies(self) -> Dict[str, float]:
         # Simplified default frequencies

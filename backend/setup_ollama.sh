@@ -5,6 +5,6 @@ echo "Setting up Ollama with Llama 3.1 model..."
 sleep 5
 
 # Pull the model
-docker exec reflexai-ollama ollama pull llama3.1
+docker exec reflexai-ollama ollama pull llama3.2:1b
 
 echo "Ollama setup complete!"

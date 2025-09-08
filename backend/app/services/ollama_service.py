@@ -7,7 +7,7 @@ import json
 logger = logging.getLogger(__name__)
 
 class OllamaService:
-    def __init__(self, model: str = "llama3.1"):
+    def __init__(self, model: str = "llama3.2:1b"):
         self.model = model
         self.base_url = "http://ollama:11434"  # Docker service name
         self.client = None

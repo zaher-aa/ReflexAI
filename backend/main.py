@@ -2,7 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
-from app.api import analysis_router
+from app.api import analysis_router, ollama_router
 from app.core.config import settings
 
 app = FastAPI(title="Text Analysis API")
@@ -16,6 +16,7 @@ app.add_middleware(
 )
 
 app.include_router(analysis_router.router, prefix="/api")
+app.include_router(ollama_router.router, prefix="/api/ollama", tags=["ollama"])
 
 @app.get("/")
 async def root():

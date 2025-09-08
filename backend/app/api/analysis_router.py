@@ -2,19 +2,17 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse, StreamingResponse
 import uuid
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import json
 import logging
+import asyncio
+import os
 
 from app.models.analysis import (
     AnalysisResult, TextInput, KeynessResult, 
-    KeywordItem, SemanticCluster, SentimentResult
+    KeywordItem, SemanticCluster, SentimentResult, AnalysisStatus
 )
-from app.services.text_processor import TextProcessor
-from app.services.keyness_analyzer import KeynessAnalyzer
-from app.services.semantic_clustering import SemanticClusterer
-from app.services.sentiment_analyzer import SentimentAnalyzer
-from app.services.ollama_service import OllamaService
+from app.services.analysis_pipeline import AnalysisPipeline
 from app.services.file_handler import FileHandler
 
 logger = logging.getLogger(__name__)
@@ -22,15 +20,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Initialize services
-text_processor = TextProcessor()
-keyness_analyzer = KeynessAnalyzer()
-semantic_clusterer = SemanticClusterer()
-sentiment_analyzer = SentimentAnalyzer()
-ollama_service = OllamaService()
+analysis_pipeline = AnalysisPipeline()
 file_handler = FileHandler()
 
 # Store for temporary results (in production, use Redis or database)
 analysis_cache: Dict[str, Any] = {}
+
+# Configuration for automatic cleanup
+DELETE_AFTER_ANALYSIS = os.getenv("DELETE_AFTER_ANALYSIS", "true").lower() == "true"
+CLEANUP_INTERVAL_SECONDS = int(os.getenv("CLEANUP_INTERVAL_SECONDS", "1800"))  # 30 minutes
+MAX_FILE_AGE_SECONDS = int(os.getenv("MAX_FILE_AGE_SECONDS", "3600"))  # 1 hour
 
 @router.post("/upload")
 async def upload_file(
@@ -57,8 +56,13 @@ async def upload_file(
     # Store in cache
     analysis_cache[analysis_id] = result
     
-    # Schedule file deletion in background (RF-22)
-    background_tasks.add_task(file_handler.delete_temp_file, file_path)
+    # Schedule file deletion in background if enabled
+    if DELETE_AFTER_ANALYSIS:
+        background_tasks.add_task(file_handler.delete_temp_file, file_path)
+        logger.info(f"Scheduled deletion of file: {file_path}")
+    
+    # Schedule cleanup of old files
+    background_tasks.add_task(file_handler.cleanup_old_files, MAX_FILE_AGE_SECONDS)
     
     return {
         "success": True,
@@ -80,48 +84,22 @@ async def analyze_text(input_data: TextInput):
     result = await analyze_text_internal(input_data.text, analysis_id)
     return result
 
-async def analyze_text_internal(text: str, analysis_id: str) -> AnalysisResult:
-    """Internal text analysis with all NLP features"""
+async def analyze_text_internal(
+    text: str, 
+    analysis_id: str,
+    parameters: Optional[Dict[str, Any]] = None
+) -> AnalysisResult:
+    """Internal text analysis using unified pipeline"""
     
     logger.info(f"Starting analysis for ID: {analysis_id}")
     
-    # Clean and process text with spaCy (RF-24)
-    cleaned_text = text_processor.clean_text(text)
-    
-    # Get word frequencies using spaCy tokenization
-    word_freq = text_processor.get_word_frequencies(cleaned_text)
-    
-    # Perform analyses
-    keyness_results = keyness_analyzer.calculate_keyness(cleaned_text)
-    clusters = semantic_clusterer.create_clusters(cleaned_text)
-    sentiment = sentiment_analyzer.analyze_sentiment(cleaned_text)
-    
-    # Get AI insights if Ollama is available
-    ai_insights = None
-    try:
-        insights = ollama_service.analyze_themes(cleaned_text, clusters)
-        if insights:
-            ai_insights = insights
-            logger.info("AI insights generated successfully")
-    except Exception as e:
-        logger.warning(f"Could not generate AI insights: {e}")
-    
-    # Create result object
-    result = AnalysisResult(
-        id=analysis_id,
-        timestamp=datetime.now().isoformat(),
-        keyness=KeynessResult(
-            keywords=[KeywordItem(**k) for k in keyness_results]
-        ),
-        semanticClusters=[SemanticCluster(**c) for c in clusters],
-        sentiment=SentimentResult(**sentiment),
-        aiInsights=ai_insights  # Add AI insights to result
-    )
+    # Use unified analysis pipeline
+    result = await analysis_pipeline.analyze(text, analysis_id, parameters)
     
     # Store in cache
     analysis_cache[analysis_id] = result
     
-    logger.info(f"Analysis completed for ID: {analysis_id}")
+    logger.info(f"Analysis completed for ID: {analysis_id} with status: {result.status}")
     
     return result
 
@@ -161,8 +139,28 @@ async def health_check():
     return {
         "status": "healthy",
         "services": {
-            "text_processor": "active",
-            "spacy": text_processor.nlp is not None,
-            "ollama": ollama_service.client is not None
+            "analysis_pipeline": "active",
+            "spacy": analysis_pipeline.text_processor.nlp is not None,
+            "ollama": analysis_pipeline.ollama_service.client is not None
+        },
+        "file_cleanup": {
+            "enabled": DELETE_AFTER_ANALYSIS,
+            "max_file_age_seconds": MAX_FILE_AGE_SECONDS,
+            "cleanup_interval_seconds": CLEANUP_INTERVAL_SECONDS
         }
+    }
+
+@router.get("/files/stats")
+async def get_file_stats():
+    """Get temporary file directory statistics"""
+    return file_handler.get_temp_directory_stats()
+
+@router.post("/files/cleanup")
+async def manual_cleanup(background_tasks: BackgroundTasks):
+    """Manually trigger file cleanup"""
+    background_tasks.add_task(file_handler.cleanup_old_files, MAX_FILE_AGE_SECONDS)
+    return {
+        "success": True,
+        "message": "File cleanup initiated",
+        "max_age_seconds": MAX_FILE_AGE_SECONDS
     }

@@ -30,25 +30,36 @@ A privacy-focused text analysis tool that helps creative writers discover insigh
 ## Quick Start
 
 ### Prerequisites
-- Node.js 18+
-- Python 3.9+
-- npm or yarn
+- Docker & Docker Compose
+- Make (for easy commands)
 
-### Installation
+### 🚀 One-Command Setup
 
-1. Clone the repository:
 ```bash
-git clone [repo]
-cd ReflexAI
-
-# Build everything
-make build
-
-# Start the application
+# Start everything with one command:
 make up
 
-# View logs if needed
-make logs
+# For first-time setup (includes AI model):
+make setup
+```
 
-# Run Ollama Service
-docker exec reflexai-ollama ollama pull llama3.1
+### 📋 Available Commands
+
+```bash
+make up       # 🏗️  Build and start all services (main command)
+make dev      # 🔧 Start in development mode with logs
+make setup    # ⚙️  Complete setup including Ollama model  
+make down     # 🛑 Stop all services
+make restart  # 🔄 Restart all services
+make logs     # 📋 View all service logs
+make status   # 📊 Check service status
+make health   # 🏥 Check application health
+make clean    # 🧹 Clean up containers and volumes
+```
+
+### 🌐 Access Points
+
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000  
+- **API Docs**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/api/health

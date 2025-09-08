@@ -9,8 +9,10 @@ class Settings(BaseSettings):
     ALLOWED_EXTENSIONS: set = {".txt"}
     
     DELETE_AFTER_ANALYSIS: bool = True
+    CLEANUP_INTERVAL_SECONDS: int = 1800
+    MAX_FILE_AGE_SECONDS: int = 3600
     
-    OLLAMA_MODEL: str = "llama3.1"
+    OLLAMA_MODEL: str = "llama3.2:1b"
     
     class Config:
         env_file = ".env"

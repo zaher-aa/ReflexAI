@@ -1,9 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import ReactMarkdown from 'react-markdown';
 import FileUpload from "./components/FileUpload";
 import KeynessChart from "./components/KeynessChart";
+import EnhancedKeynessChart from "./components/EnhancedKeynessChart";
 import SemanticClusters from "./components/SemanticClusters";
+import InteractiveSemanticClusters from "./components/InteractiveSemanticClusters";
 import SentimentDisplay from "./components/SentimentDisplay";
+import TextStatistics from "./components/TextStatistics";
+import AnalysisSummary from "./components/AnalysisSummary";
+import PrivacyNotice from "./components/PrivacyNotice";
+import PrivacyPolicy from "./components/PrivacyPolicy";
+import { ExportUtils } from "./components/ExportUtils";
 import { uploadFile, getResults, downloadResults } from "./services/api";
 import { AnalysisResult } from "./types";
 
@@ -12,6 +19,9 @@ function App() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [results, setResults] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'enhanced' | 'basic'>('enhanced');
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
 
   const handleFileUpload = async (file: File) => {
     setIsAnalyzing(true);
@@ -74,16 +84,72 @@ function App() {
     }
   };
 
+  const handleExportAll = async () => {
+    try {
+      await ExportUtils.exportAllVisualizations();
+    } catch (err) {
+      console.error("Export failed:", err);
+      setError("Failed to export visualizations.");
+    }
+  };
+
+  const handleVisualizationExport = async (type: 'png' | 'pdf', chartType: string) => {
+    try {
+      const filename = `${chartType}-${results?.id || 'analysis'}.${type}`;
+      if (type === 'png') {
+        await ExportUtils.exportToPNG(chartType, filename);
+      } else {
+        await ExportUtils.exportToPDF(chartType, filename);
+      }
+    } catch (err) {
+      console.error(`${type.toUpperCase()} export failed:`, err);
+      setError(`Failed to export ${type.toUpperCase()}.`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {!privacyAccepted && (
+        <PrivacyNotice onAccept={() => setPrivacyAccepted(true)} />
+      )}
+
+      {showPrivacyPolicy && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">Privacy Policy</h2>
+                <button
+                  onClick={() => setShowPrivacyPolicy(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              <PrivacyPolicy />
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Text Analysis Tool
-          </h1>
-          <p className="mt-2 text-gray-600">
-            Discover insights in your creative writing with AI-powered analysis
-          </p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                ReflexAI Text Analysis
+              </h1>
+              <p className="mt-2 text-gray-600">
+                Privacy-focused writing insights for creative writers
+              </p>
+            </div>
+            <button
+              onClick={() => setShowPrivacyPolicy(true)}
+              className="text-sm text-blue-600 hover:text-blue-800 underline"
+            >
+              Privacy Policy
+            </button>
+          </div>
         </div>
       </header>
 
@@ -105,12 +171,32 @@ function App() {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-semibold">Analysis Results</h2>
-              <div className="space-x-4">
+              <div className="flex items-center space-x-4">
+                <div className="flex border rounded overflow-hidden">
+                  <button
+                    onClick={() => setViewMode('enhanced')}
+                    className={`px-3 py-1 text-sm ${viewMode === 'enhanced' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                  >
+                    Enhanced
+                  </button>
+                  <button
+                    onClick={() => setViewMode('basic')}
+                    className={`px-3 py-1 text-sm ${viewMode === 'basic' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'}`}
+                  >
+                    Basic
+                  </button>
+                </div>
+                <button
+                  onClick={handleExportAll}
+                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                >
+                  Export All
+                </button>
                 <button
                   onClick={handleDownload}
-                  className="px-4 py-2 bg-primary text-white rounded hover:bg-indigo-600"
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
-                  Download Results
+                  Download Data
                 </button>
                 <button
                   onClick={() => setResults(null)}
@@ -120,6 +206,9 @@ function App() {
                 </button>
               </div>
             </div>
+
+            {/* Analysis Summary */}
+            <AnalysisSummary results={results} />
 
             {/* AI Insights Section (if available) */}
             {results.aiInsights && (
@@ -136,9 +225,51 @@ function App() {
               </div>
             )}
 
-            <KeynessChart data={results.keyness} />
-            <SemanticClusters clusters={results.semanticClusters} />
-            <SentimentDisplay sentiment={results.sentiment} />
+            {/* Keyness Analysis */}
+            {results.keyness && (
+              <div data-export-id="keyness-chart">
+                {viewMode === 'enhanced' ? (
+                  <EnhancedKeynessChart 
+                    data={results.keyness} 
+                    onExport={(type) => handleVisualizationExport(type, 'keyness-chart')}
+                  />
+                ) : (
+                  <KeynessChart data={results.keyness} />
+                )}
+              </div>
+            )}
+
+            {/* Semantic Clusters */}
+            {results.semanticClusters && results.semanticClusters.length > 0 && (
+              <div data-export-id="semantic-clusters">
+                {viewMode === 'enhanced' ? (
+                  <InteractiveSemanticClusters 
+                    clusters={results.semanticClusters}
+                    onExport={(type) => handleVisualizationExport(type, 'semantic-clusters')}
+                  />
+                ) : (
+                  <SemanticClusters clusters={results.semanticClusters} />
+                )}
+              </div>
+            )}
+
+            {/* Sentiment Analysis */}
+            {results.sentiment && (
+              <div data-export-id="sentiment-analysis">
+                <SentimentDisplay sentiment={results.sentiment} />
+              </div>
+            )}
+
+            {/* Text Statistics */}
+            {results.textStatistics && (
+              <div data-export-id="text-statistics">
+                <TextStatistics 
+                  statistics={results.textStatistics}
+                  metadata={results.metadata}
+                  onExport={(type) => handleVisualizationExport(type, 'text-statistics')}
+                />
+              </div>
+            )}
           </div>
         )}
       </main>
