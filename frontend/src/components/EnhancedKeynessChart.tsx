@@ -45,10 +45,15 @@ const EnhancedKeynessChart: React.FC<EnhancedKeynessChartProps> = ({
         word: keyword.word,
         score: keyword.score,
         frequency: keyword.frequency,
-        effectSize: keyword.effect_size || keyword.raw_score || (keyword.score > 0 ? keyword.score : -Math.abs(keyword.score)),
+        effectSize: keyword.effect_size || keyword.raw_score || keyword.score,
         category: ((keyword.effect_size || keyword.raw_score || keyword.score) > 0 ? 'positive' : 'negative') as 'positive' | 'negative'
       }))
       .sort((a, b) => Math.abs(b.effectSize) - Math.abs(a.effectSize)); // Sort by absolute value but keep sign
+    
+    // Debug logging
+    console.log('Keyness data received:', data.keywords.slice(0, 5));
+    console.log('Processed data:', processedData.slice(0, 5));
+    console.log('Negative items:', processedData.filter(d => d.category === 'negative'));
 
     // Scales
     const yScale = d3.scaleBand()
