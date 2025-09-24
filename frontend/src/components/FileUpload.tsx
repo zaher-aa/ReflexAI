@@ -16,7 +16,15 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isUploading, uplo
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'text/plain': ['.txt'] },
+    accept: {
+      'text/plain': ['.txt'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/pdf': ['.pdf'],
+      'application/rtf': ['.rtf'],
+      'application/vnd.oasis.opendocument.text': ['.odt'],
+      'text/html': ['.html', '.htm'],
+      'text/markdown': ['.md', '.markdown']
+    },
     disabled: isUploading,
     multiple: false
   });
@@ -38,9 +46,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isUploading, uplo
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             <p className="text-gray-600">
-              {isUploading ? 'Processing...' : 'Drag & drop your text file here, or click to browse'}
+              {isUploading ? 'Processing...' : 'Drag & drop your document here, or click to browse'}
             </p>
-            <p className="text-sm text-gray-500 mt-2">Supports .txt files</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Supports: .txt, .docx, .pdf, .rtf, .odt, .html, .md
+            </p>
           </div>
         )}
       </div>

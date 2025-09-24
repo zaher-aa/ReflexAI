@@ -8,6 +8,7 @@ import logging
 import time
 import mmap
 from pathlib import Path
+from app.services.document_parser import DocumentParser
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +18,15 @@ class FileHandler:
         self.upload_progress: Dict[str, float] = {}
         self.max_file_size = 50 * 1024 * 1024  # 50MB limit
         self.chunk_size = 64 * 1024  # 64KB chunks for better performance
+        self.document_parser = DocumentParser()
         os.makedirs(self.temp_dir, exist_ok=True)
     
     async def save_temp_file(self, file: UploadFile, session_id: str) -> str:
         """Save uploaded file temporarily with optimized performance for large files"""
         file_id = str(uuid.uuid4())
-        file_path = os.path.join(self.temp_dir, f"{file_id}.txt")
+        # Keep original extension for proper file type detection
+        file_ext = Path(file.filename).suffix if file.filename else '.txt'
+        file_path = os.path.join(self.temp_dir, f"{file_id}{file_ext}")
         
         try:
             # Initialize progress
@@ -79,9 +83,14 @@ class FileHandler:
                 os.remove(file_path)
             raise HTTPException(status_code=500, detail=f"Error saving file: {str(e)}")
     
-    async def read_temp_file(self, file_path: str) -> str:
-        """Read content from temporary file with optimized performance"""
+    async def read_temp_file(self, file_path: str, original_filename: str = None) -> str:
+        """Read content from temporary file using appropriate parser"""
         try:
+            # Use document parser for multi-format support
+            if original_filename:
+                return await self.document_parser.parse_document(file_path, original_filename)
+            
+            # Fallback to plain text parsing (legacy support)
             file_size = os.path.getsize(file_path)
             
             # For small files, read normally
@@ -99,6 +108,8 @@ class FileHandler:
                     
             return content
             
+        except HTTPException:
+            raise
         except UnicodeDecodeError as e:
             logger.error(f"File encoding error: {e}")
             raise HTTPException(status_code=400, detail="File must be UTF-8 encoded text")
@@ -191,3 +202,7 @@ class FileHandler:
         except Exception as e:
             logger.error(f"Error getting directory stats: {e}")
             return {"error": str(e)}
+    
+    def get_supported_formats(self) -> dict:
+        """Get list of supported file formats"""
+        return self.document_parser.get_supported_formats()

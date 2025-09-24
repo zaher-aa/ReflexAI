@@ -199,9 +199,12 @@ class AnalysisPipeline:
         words = cleaned_text.split()
         word_count = len(words)
         
-        # Sentence and paragraph counts
-        sentences = [s.strip() for s in original_text.split('.') if s.strip()]
-        sentence_count = len(sentences)
+        # Sentence and paragraph counts - improved for parsed documents
+        # Use multiple sentence ending patterns for better detection
+        import re
+        sentence_pattern = r'[.!?]+\s+'
+        sentences = [s.strip() for s in re.split(sentence_pattern, original_text) if s.strip()]
+        sentence_count = max(len(sentences), 1)  # Ensure at least 1 sentence
         
         paragraphs = [p.strip() for p in original_text.split('\n\n') if p.strip()]
         paragraph_count = max(len(paragraphs), 1)
@@ -213,6 +216,9 @@ class AnalysisPipeline:
         vocabulary_richness = unique_words / max(word_count, 1)
         
         # Improved Flesch Reading Ease score calculation
+        # Add debug logging for troubleshooting
+        logger.debug(f"Text stats - Words: {word_count}, Sentences: {sentence_count}, Chars: {char_count}")
+        
         if sentence_count > 0 and word_count > 0:
             # Better syllable estimation
             def count_syllables(word):

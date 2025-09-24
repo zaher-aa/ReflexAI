@@ -37,8 +37,11 @@ async def upload_file(
     file: UploadFile = File(...)
 ):
     """Upload file with progress tracking (RF-30)"""
-    if not file.filename.endswith('.txt'):
-        raise HTTPException(status_code=400, detail="Only .txt files are allowed")
+    # Validate file format using document parser
+    try:
+        file_handler.document_parser.detect_file_type(file.filename or '', file.filename or '')
+    except HTTPException as e:
+        raise e
     
     # Generate session ID for progress tracking
     session_id = str(uuid.uuid4())
@@ -47,8 +50,8 @@ async def upload_file(
     # Save file temporarily (RF-22)
     file_path = await file_handler.save_temp_file(file, session_id)
     
-    # Read content
-    text = await file_handler.read_temp_file(file_path)
+    # Read content using appropriate parser
+    text = await file_handler.read_temp_file(file_path, file.filename)
     
     # Process immediately
     result = await analyze_text_internal(text, analysis_id)
@@ -147,7 +150,8 @@ async def health_check():
             "enabled": DELETE_AFTER_ANALYSIS,
             "max_file_age_seconds": MAX_FILE_AGE_SECONDS,
             "cleanup_interval_seconds": CLEANUP_INTERVAL_SECONDS
-        }
+        },
+        "supported_formats": file_handler.get_supported_formats()
     }
 
 @router.get("/files/stats")
@@ -163,4 +167,12 @@ async def manual_cleanup(background_tasks: BackgroundTasks):
         "success": True,
         "message": "File cleanup initiated",
         "max_age_seconds": MAX_FILE_AGE_SECONDS
+    }
+
+@router.get("/formats")
+async def get_supported_formats():
+    """Get list of supported file formats"""
+    return {
+        "supported_formats": file_handler.get_supported_formats(),
+        "message": "List of supported document formats"
     }

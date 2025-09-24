@@ -14,8 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Download NLTK data
 RUN python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('averaged_perceptron_tagger')"
 
-# Download spaCy model
-RUN python -m spacy download en_core_web_sm
+# Download spaCy model (with fallback)
+RUN python -m spacy download en_core_web_sm || pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.6.0/en_core_web_sm-3.6.0-py3-none-any.whl
 
 # Copy the rest of the application
 COPY . .

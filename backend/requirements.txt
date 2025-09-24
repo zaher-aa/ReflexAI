@@ -16,3 +16,10 @@ python-jose==3.3.0
 ollama==0.1.7
 httpx==0.25.2
 aiofiles==23.2.1
+python-docx==1.1.0
+PyPDF2==3.0.1
+striprtf==0.0.26
+odfpy==1.4.1
+beautifulsoup4==4.12.2
+markdown==3.5.1
+python-magic==0.4.27
