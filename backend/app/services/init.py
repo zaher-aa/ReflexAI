@@ -15,11 +15,8 @@ from .sql_security import (
 __all__ = [
     "TextProcessor",
     "KeynessAnalyzer", 
-    "KeynessAnalyzer",
     "SemanticClusterer",
     "SentimentAnalyzer",
-    "OllamaService"
-]
     "OllamaService",
     "guard_against_sql_injection",
     "ensure_parameterized_query",
@@ -28,3 +25,4 @@ __all__ = [
     "scrub_order_by_clause",
     "ensure_within_directory",
 ]
+
