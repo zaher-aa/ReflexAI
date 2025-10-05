@@ -1,81 +1,121 @@
-import numpy as np
 from typing import List, Dict
 from collections import Counter
-import math
+import re
 
 class KeynessAnalyzer:
+    def __init__(self):
+        # Positive sentiment indicators - words that typically indicate positive aspects
+        self.positive_indicators = {
+            'positive', 'benefits', 'advantages', 'improve', 'enhance', 'better', 'good', 'great', 
+            'excellent', 'effective', 'efficient', 'helpful', 'useful', 'valuable', 'success', 
+            'successful', 'opportunity', 'opportunities', 'innovation', 'innovative', 'creativity', 
+            'creative', 'empowering', 'accessibility', 'accessible', 'personalized', 'personalised',
+            'adaptive', 'inclusive', 'democratisation', 'democratization', 'quality', 'modern', 
+            'cutting-edge', 'prepare', 'equipping', 'stronger', 'thrive', 'thriving', 'potential',
+            'enable', 'enables', 'enabling', 'breakthrough', 'breakthrough', 'progress', 
+            'advancement', 'solve', 'solution', 'solutions', 'optimize', 'optimized'
+        }
+        
+        # Negative sentiment indicators - words that typically indicate problems or concerns
+        self.negative_indicators = {
+            'negative', 'drawbacks', 'concerns', 'concern', 'problems', 'problem', 'issues', 'issue',
+            'risks', 'risk', 'dangers', 'danger', 'bad', 'poor', 'worse', 'worst', 'harmful', 
+            'damaging', 'damage', 'exploitation', 'exploit', 'discrimination', 'discriminate',
+            'privacy', 'overuse', 'dependent', 'dependency', 'undermine', 'undermining', 'bypass', 
+            'exclusion', 'exclude', 'divide', 'inequality', 'inequalities', 'unequal', 'bias', 
+            'biased', 'dehumanising', 'dehumanizing', 'replace', 'replacement', 'threat', 'threats',
+            'fall', 'behind', 'underprivileged', 'weakening', 'weaken', 'lose', 'losing', 'loss',
+            'difficult', 'difficulty', 'struggle', 'struggling', 'fail', 'failing', 'failure',
+            'blocked', 'block', 'unintentionally', 'inappropriate', 'misuse', 'abuse'
+        }
+
     def calculate_keyness(self, text: str, reference_freq: Dict[str, float] = None) -> List[Dict]:
-        words = text.lower().split()
+        # Clean and tokenize text
+        words = re.findall(r'\b[a-zA-Z]+\b', text.lower())
         word_freq = Counter(words)
         total_words = sum(word_freq.values())
         
-        if reference_freq is None:
-            reference_freq = self._get_default_frequencies()
+        if total_words == 0:
+            return []
+        
+        # Skip common stop words, neutral domain words, and short words
+        stop_words = {
+            'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i', 'it', 'for', 
+            'not', 'on', 'with', 'as', 'you', 'do', 'at', 'this', 'but', 'his', 'by', 
+            'from', 'they', 'we', 'say', 'her', 'she', 'or', 'an', 'will', 'my', 'one', 
+            'all', 'would', 'there', 'their', 'what', 'so', 'up', 'out', 'if', 'about', 
+            'who', 'get', 'which', 'go', 'me', 'can', 'had', 'has', 'is', 'are', 'was', 
+            'were', 'been', 'being', 'than', 'into', 'through', 'during', 'before', 
+            'after', 'above', 'below', 'between', 'among', 'such', 'may', 'might', 
+            'could', 'should', 'would', 'these', 'those', 'when', 'where', 'why', 'how',
+            # Neutral domain-specific words
+            'students', 'student', 'education', 'learners', 'learning', 'teachers', 'skills', 'tools',
+            'academic', 'systems', 'school', 'schools', 'university', 'universities',
+            'classroom', 'classrooms', 'technology', 'technologies', 'platform', 'platforms',
+            'system', 'data', 'information', 'content', 'use', 'using', 'used', 'rather',
+            'become', 'becomes', 'becoming', 'work', 'working', 'workers', 'time', 'way',
+            'ways', 'help', 'helps', 'make', 'makes', 'making', 'take', 'takes', 'taking',
+            'knowledge', 'experiences', 'experience', 'behaviour', 'behavior', 'side', 'like',
+            'while', 'however', 'down', 'aidriven', 'ai-driven', 'problem-solving', 'problemsolving'
+        }
         
         keyness_scores = []
         
-        # Calculate keyness for words present in the text
-        for word, freq in word_freq.most_common(100):
+        # Process all words and categorize by sentiment
+        for word, freq in word_freq.items():
+            if freq < 2 or len(word) < 3 or word in stop_words:
+                continue
+                
             relative_freq = freq / total_words
-            ref_freq = reference_freq.get(word, 0.0001)
             
-            # Log-likelihood calculation (preserving sign for positive/negative keyness)
-            if ref_freq > 0:
-                score = 2 * freq * math.log(relative_freq / ref_freq)
+            # Only classify words that are clearly positive or negative
+            if word in self.positive_indicators or self._is_positive_context(word, text):
+                effect_size = relative_freq * freq * 15  # Positive effect
+                sentiment = 'positive'
+            elif word in self.negative_indicators or self._is_negative_context(word, text):
+                effect_size = -(relative_freq * freq * 15)  # Negative effect
+                sentiment = 'negative'
             else:
-                score = 0
-            
-            # Effect size calculation (standardized difference)
-            effect_size = score / math.sqrt(freq) if freq > 0 else 0
+                continue  # Skip neutral words entirely
             
             keyness_scores.append({
                 'word': word,
-                'score': abs(score),  # Keep abs for ranking
-                'raw_score': score,   # Keep raw score for effect direction
+                'score': abs(effect_size),
+                'raw_score': effect_size,
                 'effect_size': effect_size,
                 'frequency': freq,
-                'confidence': min(0.95, freq / total_words * 10)  # Simple confidence metric
+                'sentiment': sentiment,
+                'confidence': min(0.95, relative_freq * 20)
             })
         
-        # Add underused/missing words (negative keyness) from reference corpus
-        underused_words = []
-        for word, ref_freq in reference_freq.items():
-            if ref_freq > 0.005:  # Only consider reasonably common words
-                text_freq = word_freq.get(word, 0)
-                text_rel_freq = text_freq / total_words if total_words > 0 else 0
-                
-                # Calculate expected vs actual frequency
-                if text_rel_freq < ref_freq * 0.5:  # Word is significantly underused
-                    # Use log-likelihood for underused words
-                    if text_freq > 0:
-                        score = 2 * text_freq * math.log(text_rel_freq / ref_freq)
-                    else:
-                        # For completely missing words, use negative score based on reference frequency
-                        score = -ref_freq * total_words * 2
-                    
-                    effect_size = score / math.sqrt(max(text_freq, 1))
-                    
-                    underused_words.append({
-                        'word': word,
-                        'score': abs(score),
-                        'raw_score': score,
-                        'effect_size': effect_size,
-                        'frequency': text_freq,
-                        'confidence': 0.8 if text_freq == 0 else 0.9
-                    })
+        # Sort by absolute effect size and return top results
+        sorted_scores = sorted(keyness_scores, key=lambda x: x['score'], reverse=True)
         
-        # Combine positive and negative keyness
-        all_keyness = keyness_scores + underused_words
-        
-        # Sort by absolute score and take top results
-        sorted_scores = sorted(all_keyness, key=lambda x: x['score'], reverse=True)[:40]
-        
-        # Ensure we have a mix of positive and negative if available
-        positive_scores = [s for s in sorted_scores if s['raw_score'] > 0][:20]
-        negative_scores = [s for s in sorted_scores if s['raw_score'] < 0][:10]
+        # Ensure balanced representation
+        positive_scores = [s for s in sorted_scores if s['effect_size'] > 0][:12]
+        negative_scores = [s for s in sorted_scores if s['effect_size'] < 0][:12]
         
         final_scores = positive_scores + negative_scores
-        return sorted(final_scores, key=lambda x: x['score'], reverse=True)[:30]
+        return sorted(final_scores, key=lambda x: x['score'], reverse=True)[:20]
+    
+    def _is_positive_context(self, word: str, text: str) -> bool:
+        # Check if word appears in positive contexts
+        positive_patterns = [
+            r'\b' + re.escape(word) + r'\s+(?:helps?|improves?|enhances?|enables?)',
+            r'(?:benefits?|advantages?)\s+.*\b' + re.escape(word),
+            r'\b' + re.escape(word) + r'\s+(?:opportunities?|solutions?)'
+        ]
+        return any(re.search(pattern, text, re.IGNORECASE) for pattern in positive_patterns)
+    
+    def _is_negative_context(self, word: str, text: str) -> bool:
+        # Check if word appears in negative contexts
+        negative_patterns = [
+            r'(?:concerns?|risks?|problems?|issues?)\s+.*\b' + re.escape(word),
+            r'\b' + re.escape(word) + r'\s+(?:risks?|concerns?|problems?)',
+            r'(?:danger|risk)\s+.*\b' + re.escape(word),
+            r'\b' + re.escape(word) + r'\s+(?:may|could|might)\s+.*(?:harm|damage|undermine)'
+        ]
+        return any(re.search(pattern, text, re.IGNORECASE) for pattern in negative_patterns)
     
     def _get_default_frequencies(self) -> Dict[str, float]:
         # Enhanced default frequencies based on common English corpus

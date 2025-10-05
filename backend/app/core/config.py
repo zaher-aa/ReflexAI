@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     MAX_FILE_AGE_SECONDS: int = 3600
     
     OLLAMA_MODEL: str = "llama3.2:1b"
+    OLLAMA_HOST: str = "http://localhost:11434"
     
     class Config:
         env_file = ".env"

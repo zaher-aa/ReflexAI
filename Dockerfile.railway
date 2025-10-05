@@ -1,0 +1,50 @@
+# Multi-service container for Railway
+FROM node:18-alpine AS frontend-build
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm ci --only=production
+COPY frontend/ ./
+RUN npm run build
+
+FROM python:3.11-slim AS backend
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    curl \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY backend/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Download NLTK data
+RUN python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords')"
+
+# Download spaCy model with fallback
+RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed, will use fallback"
+
+# Install Ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
+# Copy application code
+COPY backend/ ./
+COPY --from=frontend-build /app/frontend/dist ./static
+
+# Create supervisor configuration
+RUN mkdir -p /etc/supervisor/conf.d
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Set environment variables
+ENV PORT=8000
+ENV PYTHONPATH=/app
+ENV OLLAMA_HOST=0.0.0.0:11434
+
+# Create startup script
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
+EXPOSE 8000
+CMD ["/start.sh"]
